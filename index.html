@@ -34,9 +34,10 @@ ol { padding-left:18px; margin:4px 0; } li { margin:2px 0; } a { color:var(--acc
 .topic h3 { margin:0 0 2px; font-size:17px; } .idea { border-color:var(--accent); } .topic .en { color:var(--muted); font-size:12px; margin-bottom:6px; }
 </style></head><body><main>
 <div class="card mapcard">
-  <div class="viewbar" id="viewbar" hidden><button class="btn on" data-view="2d">2D 지도</button><button class="btn" data-view="3d">3D 지도</button>
+  <div class="viewbar" id="viewbar" hidden>
     <span class="meta" id="hint3" style="font-size:11px; line-height:1.3"></span></div>
-  <div id="map"></div><div id="map3" style="display:none"></div>
+  <div id="map" style="display:none"></div><div id="map3"></div>  
+  
 </div>
 <div class="card" id="side">
   <h1>HE 공백 탐색기 <span class="meta">(한 줄 요약 지도)</span></h1>
@@ -3684,13 +3685,14 @@ const shapes = D.gaps.map(c => ({ type: 'circle', xref: 'x', yref: 'y', x0: c[0]
   line: { color: css('--ring'), width: 1.2 } }));
 const ann = D.clusters.map(c => ({ x: c[0], y: c[1], text: esc(c[2]), showarrow: false, font: { size: 10, color: css('--muted') } }));
 const gd = document.getElementById('map');
+const START3D = true;  // 데모: 2D 지도는 그리지 않는다 (예전엔 2D를 먼저 그렸다가 숨겨서 잠깐 보였다)
 const layout = { paper_bgcolor: css('--card'), plot_bgcolor: css('--card'), font: { color: css('--fg') }, margin: { l: 4, r: 4, t: 4, b: 4 },
   // 연한 격자: 위치 감을 잡는 용도라 눈금 숫자는 숨긴다
   xaxis: { showgrid: true, gridcolor: css('--grid'), zeroline: false, showticklabels: false, showline: false, ticks: '' },
   yaxis: { showgrid: true, gridcolor: css('--grid'), zeroline: false, showticklabels: false, showline: false, ticks: '', scaleanchor: 'x' },
   legend: { orientation: 'h', y: 0, itemsizing: 'constant' },
   shapes, annotations: ann, dragmode: 'pan', hovermode: 'closest' };
-Plotly.newPlot(gd, [trace(0, '수요 논문', css('--dem'), 4, 0.8), trace(1, 'HE 논문', css('--he'), 4, 0.85)], layout,
+if (!START3D) Plotly.newPlot(gd, [trace(0, '수요 논문', css('--dem'), 4, 0.8), trace(1, 'HE 논문', css('--he'), 4, 0.85)], layout,
   { responsive: true, displaylogo: false, scrollZoom: true, modeBarButtonsToRemove: ['toImage'] });
 
 function nearest(x, y) {
@@ -3745,7 +3747,7 @@ function show(x, y) {
 
 // Plotly가 드래그용으로 이벤트를 가로채므로 window에서 capture 단계로 받는다
 let down = null;
-const inPlot = e => { const r = gd.querySelector('.nsewdrag').getBoundingClientRect();
+const inPlot = e => { const el = gd.querySelector('.nsewdrag'); if (!el) return null; const r = el.getBoundingClientRect();
   return e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom ? r : null; };
 window.addEventListener('pointerdown', e => { down = inPlot(e) && !e.target.closest('.modebar') ? [e.clientX, e.clientY] : null; }, true);
 window.addEventListener('pointerup', e => {
@@ -3822,9 +3824,7 @@ function setView(v) {
 }
 if (has3d) {
   document.getElementById('viewbar').hidden = false;
-  if (true) {  // 데모: 처음부터 3D, 2D 버튼은 숨김
-    document.querySelector('[data-view="2d"]').hidden = true; document.querySelector('[data-view="3d"]').hidden = true; setView('3d');
-  }
+  if (START3D) setView('3d');  // 데모: 처음부터 3D (전환 버튼은 페이지에 아예 없음)
   document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
 }
 </script></body></html>
