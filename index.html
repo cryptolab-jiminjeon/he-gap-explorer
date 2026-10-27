@@ -3770,7 +3770,7 @@ function init3() {
       customdata: idx, text: idx.map(i => esc(D.t[i])), hovertemplate: '%{text}<extra></extra>', marker: { size: 0.8, color } }; };
   const empties = { type: 'scatter3d', mode: 'markers', name: 'HE가 거의 없는 위치 (클릭)',
     x: EMPTY3.map(i => D.cells3[i].x), y: EMPTY3.map(i => D.cells3[i].y), z: EMPTY3.map(i => D.cells3[i].z), customdata: EMPTY3,
-    text: EMPTY3.map(i => esc(D.cells3[i].topic_ko || '(주제 없음)')), hovertemplate: 'HE가 거의 없는 위치: %{text}<extra></extra>',
+    text: EMPTY3.map(i => esc(D.cells3[i].topic_ko || '(주제 없음)')), hovertemplate: '%{text}<extra></extra>',
     marker: { size: 2, symbol: 'diamond', color: css('--cursor') } };
   const idea = { type: 'scatter3d', mode: 'markers', name: '입력한 아이디어', x: [], y: [], z: [], hoverinfo: 'skip',
     marker: { size: 9, symbol: 'diamond', color: css('--gap'), line: { color: css('--fg'), width: 2 } }, showlegend: false };
