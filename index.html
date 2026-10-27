@@ -50,6 +50,8 @@ ol { padding-left:18px; margin:4px 0; } li { margin:4px 0; } a { color:var(--acc
 .years i { display:block; width:22px; background:var(--dem); border-radius:2px 2px 0 0; }
 .ylab { display:flex; gap:3px; font-size:10px; color:var(--muted); } .ylab span { width:22px; text-align:center; }
 .prob { font-size:13px; } .src { font-size:12px; color:var(--muted); }
+.tip { position:absolute; z-index:7; pointer-events:none; display:none; max-width:340px; background:var(--card); color:var(--fg);
+  border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:12px; line-height:1.4; box-shadow:0 2px 8px rgba(0,0,0,.12); }
 .key { white-space:nowrap; } .key i { display:inline-block; width:8px; height:8px; border-radius:50%; margin:0 3px 0 6px; vertical-align:middle; }
 /* 모바일: 지도를 위에 붙여 두고 결과는 그 아래에서 스크롤 (위의 .mapcard 규칙보다 뒤에 와야 한다) */
 @media (max-width:900px) { main { display:block; height:auto; }
@@ -58,9 +60,9 @@ ol { padding-left:18px; margin:4px 0; } li { margin:4px 0; } a { color:var(--acc
 </style></head><body><main>
 <div class="card mapcard">
   <div class="hint"><button class="back" id="heonly">HE만 보기</button> 구를 누르면 그 지점의 주제를 보여 줍니다 · 끌어서 회전 · <span class="long">휠·</span>두 손가락·+/− 버튼으로 확대
-    <span class="key"><i style="background:var(--mhe)"></i>HE <i style="background:var(--mdem)"></i>수요 <i style="background:var(--mhole)"></i>주변에 HE가 없는 수요</span><span class="long"> · 범례를 누르면 점을 숨길 수 있습니다.</span></div>
+    <span class="key"><i style="background:var(--mhe)"></i>HE <i style="background:var(--mdem)"></i>수요 <i style="background:var(--mhole)"></i>주변에 HE가 없는 수요</span></div>
   <div class="zoom"><button id="zin" aria-label="확대">+</button><button id="zout" aria-label="축소">−</button></div>
-  <div id="map3"></div>
+  <div id="map3"></div><div class="tip" id="tip"></div>
 </div>
 <div class="card" id="side">
   <h1>HE 공백 지도</h1>
@@ -3717,55 +3719,74 @@ let SIG = sigFor(Math.hypot(START.x, START.y, START.z)), cur = null, markP = nul
 const cardOf = {}; C.forEach((c, i) => { if (c.u != null) cardOf[c.u] = i; });
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const norm = p => { const n = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0] / n, p[1] / n, p[2] / n]; };
-const P = D.x.map((_, i) => [D.x[i], D.y[i], D.z[i]]);
+const P = D.x.map((_, i) => norm([D.x[i], D.y[i], D.z[i]]));  // 소수점 반올림으로 길이가 1에서 조금 벗어나 있다
 
-function pts(g, h, name, color) {
-  const idx = []; for (let i = 0; i < N; i++) if (D.g[i] === g && D.h[i] === h) idx.push(i);
-  return { type: 'scatter3d', mode: 'markers', name, x: idx.map(i => D.x[i]), y: idx.map(i => D.y[i]), z: idx.map(i => D.z[i]),
-    customdata: idx, text: idx.map(i => esc(D.t[i])), hovertemplate: '%{text}<extra></extra>', marker: { size: 1.4, color } };
+// 논문은 떠 있는 점이 아니라 구 표면에 붙은 작은 원판으로 그린다 (지구본에 인쇄된 점처럼 매끈하게)
+const RAD = Math.PI / 180, DISC = 0.65, DSIDE = 10;  // 원판 반지름(°)과 변 수
+const kindOf = i => D.g[i] ? 2 : D.h[i] ? 1 : 0;
+const tangent = p => {  // p에 수직인 두 단위 벡터
+  const t = Math.abs(p[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const u = norm([p[1] * t[2] - p[2] * t[1], p[2] * t[0] - p[0] * t[2], p[0] * t[1] - p[1] * t[0]]);
+  return [u, [p[1] * u[2] - p[2] * u[1], p[2] * u[0] - p[0] * u[2], p[0] * u[1] - p[1] * u[0]]];
+};
+function discs(kind, name, color) {
+  const x = [], y = [], z = [], i = [], j = [], k = [], r = 1.002, c = Math.cos(DISC * RAD), d = Math.sin(DISC * RAD);
+  for (let n = 0; n < N; n++) {
+    if (kindOf(n) !== kind) continue;
+    const p = P[n], [u, v] = tangent(p), o = x.length;
+    x.push(r * p[0]); y.push(r * p[1]); z.push(r * p[2]);
+    for (let s = 0; s < DSIDE; s++) {
+      const f = 2 * Math.PI * s / DSIDE, cf = Math.cos(f), sf = Math.sin(f);
+      x.push(r * (c * p[0] + d * (cf * u[0] + sf * v[0]))); y.push(r * (c * p[1] + d * (cf * u[1] + sf * v[1]))); z.push(r * (c * p[2] + d * (cf * u[2] + sf * v[2])));
+      i.push(o); j.push(o + 1 + s); k.push(o + 1 + (s + 1) % DSIDE);
+    }
+  }
+  return { type: 'mesh3d', name, x, y, z, i, j, k, color, opacity: 1, hoverinfo: 'none', showlegend: false, flatshading: true,
+    lighting: { ambient: 1, diffuse: 0, specular: 0, roughness: 1, fresnel: 0 } };
 }
-function globe() {  // 불투명한 속 구: 뒤쪽 반구의 점이 비쳐 보이지 않게, 빈 곳을 눌러도 구역을 고를 수 있게
-  const x = [], y = [], z = [], i = [], j = [], k = [], r = 0.985, L = 36, M = 72;
+function globe() {  // 불투명한 흰 구: 뒤쪽 반구가 비쳐 보이지 않게, 빈 곳을 눌러도 지점을 고를 수 있게
+  const x = [], y = [], z = [], i = [], j = [], k = [], L = 90, M = 180;
   for (let a = 0; a <= L; a++) for (let b = 0; b < M; b++) {
     const la = Math.PI * (a / L - 0.5), lo = 2 * Math.PI * b / M;
-    x.push(r * Math.cos(la) * Math.cos(lo)); y.push(r * Math.cos(la) * Math.sin(lo)); z.push(r * Math.sin(la));
+    x.push(Math.cos(la) * Math.cos(lo)); y.push(Math.cos(la) * Math.sin(lo)); z.push(Math.sin(la));
   }
   for (let a = 0; a < L; a++) for (let b = 0; b < M; b++) {
     const p = a * M + b, q = a * M + (b + 1) % M;
     i.push(p, q); j.push(q, q + M); k.push(p + M, p + M);
   }
   return { type: 'mesh3d', x, y, z, i, j, k, color: css('--globe'), opacity: 1, hoverinfo: 'none', showlegend: false,
-    flatshading: true, lighting: { ambient: 1, diffuse: 0, specular: 0, roughness: 1, fresnel: 0 } };
+    lighting: { ambient: 0.85, diffuse: 0.25, specular: 0, roughness: 1, fresnel: 0 }, lightposition: { x: 1e5, y: 1e5, z: 1e5 } };
 }
 function wire() {  // 연한 위도·경도 선 (위치 감을 잡는 용도)
-  const x = [], y = [], z = [], r = 1.0, rad = Math.PI / 180;
-  const put = (la, lo) => { x.push(r * Math.cos(la * rad) * Math.cos(lo * rad)); y.push(r * Math.cos(la * rad) * Math.sin(lo * rad)); z.push(r * Math.sin(la * rad)); };
-  for (let lo = 0; lo < 360; lo += 30) { for (let la = -90; la <= 90; la += 5) put(la, lo); x.push(null); y.push(null); z.push(null); }
-  for (let la = -60; la <= 60; la += 30) { for (let lo = 0; lo <= 360; lo += 5) put(la, lo); x.push(null); y.push(null); z.push(null); }
+  const x = [], y = [], z = [], r = 1.002;
+  const put = (la, lo) => { x.push(r * Math.cos(la * RAD) * Math.cos(lo * RAD)); y.push(r * Math.cos(la * RAD) * Math.sin(lo * RAD)); z.push(r * Math.sin(la * RAD)); };
+  for (let lo = 0; lo < 360; lo += 30) { for (let la = -90; la <= 90; la += 3) put(la, lo); x.push(null); y.push(null); z.push(null); }
+  for (let la = -60; la <= 60; la += 30) { for (let lo = 0; lo <= 360; lo += 3) put(la, lo); x.push(null); y.push(null); z.push(null); }
   return { type: 'scatter3d', mode: 'lines', x, y, z, hoverinfo: 'skip', showlegend: false, line: { color: css('--mgrid'), width: 1 } };
 }
 const ringTrace = { type: 'scatter3d', mode: 'lines', x: [], y: [], z: [], hoverinfo: 'skip', showlegend: false,
   line: { color: '#1d1d1b', width: 2 } };
-const dotTrace = { type: 'scatter3d', mode: 'markers', x: [], y: [], z: [], hoverinfo: 'skip', showlegend: false,
-  marker: { size: 4, color: css('--cursor'), symbol: 'circle' } };
+// 누른 지점: 표면에 붙은 작은 원판 (떠 있는 마커 대신)
+const DOTN = 20, dotTrace = { type: 'mesh3d', x: [0, 0, 0], y: [0, 0, 0], z: [0, 0, 0], i: [0], j: [1], k: [2], visible: false,
+  color: css('--cursor'), opacity: 1, hoverinfo: 'skip', showlegend: false, flatshading: true,
+  lighting: { ambient: 1, diffuse: 0, specular: 0, roughness: 1, fresnel: 0 } };
 // 지구본처럼 남극과 북극을 꿰는 축: 돌려도 어느 쪽이 위인지 헷갈리지 않게
 const axisTrace = { type: 'scatter3d', mode: 'lines+text', x: [0, 0], y: [0, 0], z: [-1.1, 1.1], text: ['S', 'N'],
   textposition: ['bottom center', 'top center'], textfont: { color: css('--axis'), size: 12 },
   hoverinfo: 'skip', showlegend: false, line: { color: css('--axis'), width: 2 } };
 const ax = { visible: false, range: [-1.1, 1.1] };
-const PAPERS = [2, 4], GLOBE = 1, RING = 5, DOT = 6;  // trace 번호
-Plotly.newPlot(gd, [wire(), globe(), pts(0, 0, '수요 논문', css('--mdem')), pts(0, 1, '주변에 HE가 없는 수요 논문', css('--mhole')),
-    pts(1, 0, 'HE 논문', css('--mhe')), ringTrace, dotTrace, axisTrace],
+const DEM = [2, 3], RING = 5, DOT = 6;  // trace 번호 (0 선, 1 구, 2·3 수요, 4 HE, 7 축)
+Plotly.newPlot(gd, [wire(), globe(), discs(0, '수요 논문', css('--mdem')), discs(1, '주변에 HE가 없는 수요 논문', css('--mhole')),
+    discs(2, 'HE 논문', css('--mhe')), ringTrace, dotTrace, axisTrace],
   { paper_bgcolor: css('--card'), font: { color: css('--fg') }, margin: { l: 0, r: 0, t: 0, b: 0 },
-    showlegend: !matchMedia('(max-width:900px)').matches,  // 휴대폰에서는 범례가 세로로 길어져 구를 가린다 (색은 위 안내에)
-    legend: { orientation: 'h', y: 0, itemsizing: 'constant' }, hovermode: 'closest',
+    showlegend: false, hovermode: false,  // 색은 위 안내에, 마우스 아래 논문은 직접 찾는다
     scene: { aspectmode: 'cube', bgcolor: css('--card'), xaxis: ax, yaxis: ax, zaxis: ax, camera: { eye: START } } },
   { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage', 'sendChartToCloud', 'zoom3d', 'pan3d', 'orbitRotation', 'tableRotation'] });
 
 let heOnly = false;
 document.getElementById('heonly').addEventListener('click', e => {
   heOnly = !heOnly; e.target.textContent = heOnly ? '수요 논문도 보기' : 'HE만 보기';
-  Plotly.restyle(gd, { visible: heOnly ? false : true }, [2, 3]);
+  Plotly.restyle(gd, { visible: !heOnly }, DEM);
 });
 const eye = () => { const sc = gd._fullLayout.scene, live = sc._scene && sc._scene.getCamera ? sc._scene.getCamera() : null;
   return (live || sc.camera).eye; };
@@ -3798,16 +3819,17 @@ function face(p) {  // 지구본을 돌려 그 자리가 앞으로 오게 (확�
 }
 function ring(p) {  // 누른 지점 표시: 작은 점 + 주제를 셀 때 가중치가 큰 범위(σ)의 옅은 원
   markP = p;
-  if (!p) { Plotly.restyle(gd, { x: [[], []], y: [[], []], z: [[], []] }, [RING, DOT]); return; }
-  const t = Math.abs(p[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
-  const u = norm([p[1] * t[2] - p[2] * t[1], p[2] * t[0] - p[0] * t[2], p[0] * t[1] - p[1] * t[0]]);
-  const v = [p[1] * u[2] - p[2] * u[1], p[2] * u[0] - p[0] * u[2], p[0] * u[1] - p[1] * u[0]];
-  const a = SIG * Math.PI / 180, x = [], y = [], z = [];
-  for (let s = 0; s <= 72; s++) {
-    const f = 2 * Math.PI * s / 72, c = Math.cos(a), d = Math.sin(a);
-    for (const [arr, q] of [[x, 0], [y, 1], [z, 2]]) arr.push(1.01 * (c * p[q] + d * (Math.cos(f) * u[q] + Math.sin(f) * v[q])));
-  }
-  Plotly.restyle(gd, { x: [x, [1.01 * p[0]]], y: [y, [1.01 * p[1]]], z: [z, [1.01 * p[2]]] }, [RING, DOT]);
+  if (!p) { Plotly.restyle(gd, { x: [[]], y: [[]], z: [[]] }, [RING]); Plotly.restyle(gd, { visible: false }, [DOT]); return; }
+  const [u, v] = tangent(p);
+  const circle = (deg, n, r) => { const a = deg * RAD, c = Math.cos(a), d = Math.sin(a), o = [[], [], []];
+    for (let s = 0; s <= n; s++) { const f = 2 * Math.PI * s / n;
+      for (let q = 0; q < 3; q++) o[q].push(r * (c * p[q] + d * (Math.cos(f) * u[q] + Math.sin(f) * v[q]))); }
+    return o; };
+  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(0.7, DOTN, 1.004);
+  dx.push(1.004 * p[0]); dy.push(1.004 * p[1]); dz.push(1.004 * p[2]);  // 원판: 가운데 점과 둘레로 부채꼴
+  const fi = [], fj = [], fk = []; for (let s = 0; s < DOTN; s++) { fi.push(DOTN + 1); fj.push(s); fk.push(s + 1); }
+  Plotly.restyle(gd, { x: [x], y: [y], z: [z] }, [RING]);
+  Plotly.restyle(gd, { x: [dx], y: [dy], z: [dz], i: [fi], j: [fj], k: [fk], visible: true }, [DOT]);
 }
 
 function list() {
@@ -3892,29 +3914,71 @@ function spot(p, clicked) {
   if (narrow() && !zoomTimer) document.getElementById('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.querySelectorAll('#out [data-c]').forEach(b => b.addEventListener('click', () => card(+b.dataset.c, false, () => spot(p, clicked))));
 }
-// 지점 고르기. Plotly 3D의 plotly_click은 버튼을 누르는 순간과 누르고 있는 동안 화면을 그릴 때마다 나오고(그 안에서
-// 다시 그리면 무한 재귀, 돌리려고 누른 것도 선택이 됨), 빨리 누르면 안 나오기도 한다. 그래서 고르는 것은 뗄 때만 한다:
-// 거의 움직이지 않고 짧게 눌렀다 뗐으면 선택, 끌었으면 돌리기만. 점은 이번 누름의 plotly_click, 없으면 커서 아래의 점(plotly_hover).
-let lastHover = null, lastClick = null, lastPick = 0, down = null;
-function pick(points) {
-  const q = points.find(q => q.curveNumber >= PAPERS[0] && q.curveNumber <= PAPERS[1]) || points.find(q => q.curveNumber === GLOBE);
-  if (!q || Date.now() - lastPick < 400) return;
-  lastPick = Date.now();
-  const p = q.curveNumber === GLOBE ? norm([q.x, q.y, q.z]) : P[q.customdata], i = q.curveNumber === GLOBE ? null : q.customdata;
-  setTimeout(() => spot(p, i), 0);
+// 지점 고르기. Plotly 3D가 알려 주는 점은 메시의 꼭짓점이라 정확하지 않고, plotly_click은 누르는 순간 나와서
+// 돌리려고 누른 것도 선택이 된다. 그래서 마우스 위치에서 나가는 시선이 구와 만나는 점을 카메라 행렬로 직접 구하고,
+// 고르는 것은 뗄 때만 한다: 거의 움직이지 않고 짧게 눌렀다 뗐으면 선택, 끌었으면 돌리기만.
+const mmul = (a, b) => { const o = new Array(16).fill(0);  // 4×4, 열 우선
+  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k];
+  return o; };
+function inv4(m) {
+  const [a00, a01, a02, a03, a10, a11, a12, a13, a20, a21, a22, a23, a30, a31, a32, a33] = m;
+  const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10, b02 = a00 * a13 - a03 * a10, b03 = a01 * a12 - a02 * a11,
+    b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12, b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30,
+    b08 = a20 * a33 - a23 * a30, b09 = a21 * a32 - a22 * a31, b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
+  const d = 1 / (b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06);
+  return [(a11 * b11 - a12 * b10 + a13 * b09) * d, (a02 * b10 - a01 * b11 - a03 * b09) * d, (a31 * b05 - a32 * b04 + a33 * b03) * d, (a22 * b04 - a21 * b05 - a23 * b03) * d,
+    (a12 * b08 - a10 * b11 - a13 * b07) * d, (a00 * b11 - a02 * b08 + a03 * b07) * d, (a32 * b02 - a30 * b05 - a33 * b01) * d, (a20 * b05 - a22 * b02 + a23 * b01) * d,
+    (a10 * b10 - a11 * b08 + a13 * b06) * d, (a01 * b08 - a00 * b10 - a03 * b06) * d, (a30 * b04 - a31 * b02 + a33 * b00) * d, (a21 * b02 - a20 * b04 - a23 * b00) * d,
+    (a11 * b07 - a10 * b09 - a12 * b06) * d, (a00 * b09 - a01 * b07 + a02 * b06) * d, (a31 * b01 - a30 * b03 - a32 * b00) * d, (a20 * b03 - a21 * b01 + a22 * b00) * d];
 }
-gd.on('plotly_hover', ev => { lastHover = { points: ev.points, t: Date.now() }; });
-gd.on('plotly_click', ev => { if (!lastClick) lastClick = { points: ev.points, t: Date.now() }; });  // 누른 순간의 점
-gd.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: Date.now() }; lastClick = null; }, true);
+function surfaceAt(cx, cy) {  // 화면 좌표 → 구 표면의 방향 (구를 벗어나면 null)
+  const sc = gd._fullLayout.scene._scene, gl = sc && sc.glplot;
+  if (!gl) return null;
+  const cp = gl.cameraParams, ds = sc.dataScale, r = gl.canvas.getBoundingClientRect();
+  const M = inv4(mmul(cp.projection, mmul(cp.view, mmul(cp.model, [ds[0], 0, 0, 0, 0, ds[1], 0, 0, 0, 0, ds[2], 0, 0, 0, 0, 1]))));
+  const nx = 2 * (cx - r.left) / r.width - 1, ny = 1 - 2 * (cy - r.top) / r.height;
+  const un = z => { const v = [0, 0, 0, 0], q = [nx, ny, z, 1];
+    for (let a = 0; a < 4; a++) for (let k = 0; k < 4; k++) v[a] += M[k * 4 + a] * q[k];
+    return [v[0] / v[3], v[1] / v[3], v[2] / v[3]]; };
+  const a = un(-1), b = un(1), d = norm([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+  const B = dot(a, d), disc = B * B - dot(a, a) + 1;
+  if (disc < 0) return null;
+  const t = -B - Math.sqrt(disc);
+  return norm([a[0] + t * d[0], a[1] + t * d[1], a[2] + t * d[2]]);
+}
+function paperAt(p) {  // 그 자리의 원판 논문 (없으면 null)
+  let bi = null, bc = Math.cos(1.3 * DISC * RAD);
+  for (let i = 0; i < N; i++) { if (heOnly && !D.g[i]) continue; const c = dot(P[i], p); if (c > bc) { bc = c; bi = i; } }
+  return bi;
+}
+let down = null, hoverFrame = 0;
+const tip = document.getElementById('tip'), mapcard = gd.parentElement;
+gd.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: Date.now() }; tip.style.display = 'none'; }, true);
 gd.addEventListener('pointerup', e => {
   if (!down || pinch) { down = null; return; }
   const tol = e.pointerType === 'touch' ? 10 : 5;
   const still = Math.hypot(e.clientX - down.x, e.clientY - down.y) < tol && Date.now() - down.t < 500;
   down = null;
-  if (!still) return;
-  if (lastClick) pick(lastClick.points);
-  else if (lastHover && Date.now() - lastHover.t < 2000) pick(lastHover.points);
+  const p = still ? surfaceAt(e.clientX, e.clientY) : null;
+  if (!p) return;
+  const i = paperAt(p);
+  setTimeout(() => spot(i == null ? p : P[i], i), 0);
 }, true);
+gd.addEventListener('pointermove', e => {  // 마우스 아래 논문 제목
+  if (down || e.pointerType === 'touch') return;
+  const cx = e.clientX, cy = e.clientY;
+  cancelAnimationFrame(hoverFrame);
+  hoverFrame = requestAnimationFrame(() => {
+    const p = surfaceAt(cx, cy), i = p ? paperAt(p) : null;
+    if (i == null) { tip.style.display = 'none'; gd.style.cursor = ''; return; }
+    const r = mapcard.getBoundingClientRect();
+    tip.innerHTML = `${D.g[i] ? '<span class="he">HE</span> · ' : ''}${esc(D.t[i])} (${D.yr[i]})`;
+    tip.style.display = 'block'; gd.style.cursor = 'pointer';
+    tip.style.left = Math.max(6, Math.min(cx - r.left + 12, r.width - tip.offsetWidth - 6)) + 'px';
+    tip.style.top = (cy - r.top + 16) + 'px';
+  });
+});
+gd.addEventListener('pointerleave', () => { cancelAnimationFrame(hoverFrame); tip.style.display = 'none'; });
 let zoomTimer = null;
 gd.on('plotly_relayout', e => {
   if (!Object.keys(e).some(k => k.startsWith('scene.camera'))) return;
