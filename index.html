@@ -3693,7 +3693,7 @@ const layout = { paper_bgcolor: css('--card'), plot_bgcolor: css('--card'), font
   legend: { orientation: 'h', y: 0, itemsizing: 'constant' },
   shapes, annotations: ann, dragmode: 'pan', hovermode: 'closest' };
 if (!START3D) Plotly.newPlot(gd, [trace(0, '수요 논문', css('--dem'), 4, 0.8), trace(1, 'HE 논문', css('--he'), 4, 0.85)], layout,
-  { responsive: true, displaylogo: false, scrollZoom: true, modeBarButtonsToRemove: ['toImage'] });
+  { responsive: true, displaylogo: false, scrollZoom: true, modeBarButtonsToRemove: ['toImage', 'sendChartToCloud'] });
 
 function nearest(x, y) {
   const d = new Float64Array(N); for (let i = 0; i < N; i++) d[i] = Math.hypot(D.x[i]-x, D.y[i]-y);
@@ -3781,7 +3781,7 @@ function init3() {
   Plotly.newPlot(gd3, [t3(0, '수요 논문', css('--dem')), t3(1, 'HE 논문', css('--he')), empties, idea],
     { paper_bgcolor: css('--card'), font: { color: css('--fg') }, margin: { l: 0, r: 0, t: 0, b: 0 }, legend: { orientation: 'h', y: 0, itemsizing: 'constant' },
       scene: { aspectmode: 'data', bgcolor: css('--card'), xaxis: ax, yaxis: ax, zaxis: ax }, hovermode: 'closest' },
-    { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage'] });
+    { responsive: true, displaylogo: false, modeBarButtonsToRemove: ['toImage', 'sendChartToCloud', 'zoom3d', 'pan3d', 'orbitRotation', 'tableRotation'] });
   gd3.on('plotly_click', ev => {
     const p = ev.points.find(q => q.curveNumber < IDEA); if (!p) return;
     if (p.curveNumber === 2) show3([p.x, p.y, p.z], D.cells3[p.customdata]);  // HE가 거의 없는 위치
@@ -3818,7 +3818,7 @@ function setView(v) {
   document.getElementById('map').style.display = v === '2d' ? '' : 'none';
   document.getElementById('map3').style.display = v === '3d' ? '' : 'none';
   document.getElementById('hint3').textContent = v === '3d'
-    ? '끌어서 돌리고 휠로 확대 · 분홍 마름모 = HE 논문이 거의 없는 위치(클릭하면 주제와 검토) · 범례를 누르면 논문 점을 숨길 수 있습니다.' : '';
+    ? '왼쪽 끌기 회전 · 오른쪽 끌기 이동 · 휠 확대 · 분홍 마름모 = HE 논문이 거의 없는 위치(클릭하면 주제와 검토) · 범례를 누르면 논문 점을 숨길 수 있습니다.' : '';
   if (v === '3d' && !gd3) init3();
   Plotly.Plots.resize(v === '3d' ? gd3 : gd);
 }
