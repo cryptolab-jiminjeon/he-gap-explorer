@@ -5,15 +5,16 @@
 <style>
 :root { --bg:#fafaf8; --fg:#1d1d1b; --muted:#6b6b66; --card:#fff; --line:#e3e2dc; --accent:#2f5fb3;
   --he:#1f3f8a; --dem:#f2a65a; --chip:#eef2f9; --cursor:#d6336c; --grid3:#d2d1ca; --good:#2b8a3e; --costly:#b7791f;
-  --demg:#c9c8c0; --hole:#e8590c; --globe:#f3f2ec; }
+  --demg:#c9c8c0; --hole:#e8590c; --globe:#ffffff; --axis:#8a8983;
+  --mdem:#c9c8c0; --mhe:#1f3f8a; --mhole:#e8590c; --mgrid:#d2d1ca; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --bg:#171716; --fg:#ecebe6; --muted:#a3a29b; --card:#222220; --line:#3a3936; --accent:#7ea6ec;
   --he:#8fb0ff; --dem:#f5b57a; --chip:#2a3142; --cursor:#ff5c8a; --grid3:#4a4a45; --good:#69db7c; --costly:#f0b85a;
-  --demg:#5e5d58; --hole:#ff8a4c; --globe:#262624; color-scheme:dark; } }
+  --demg:#5e5d58; --hole:#ff8a4c; --axis:#8a8983; color-scheme:dark; } }
 :root[data-theme="dark"] {
   --bg:#171716; --fg:#ecebe6; --muted:#a3a29b; --card:#222220; --line:#3a3936; --accent:#7ea6ec;
   --he:#8fb0ff; --dem:#f5b57a; --chip:#2a3142; --cursor:#ff5c8a; --grid3:#4a4a45; --good:#69db7c; --costly:#f0b85a;
-  --demg:#5e5d58; --hole:#ff8a4c; --globe:#262624; color-scheme:dark; }
+  --demg:#5e5d58; --hole:#ff8a4c; --axis:#8a8983; color-scheme:dark; }
 * { box-sizing:border-box; }
 html, body { height:100%; }
 body { background:var(--bg); color:var(--fg); font:14px/1.55 system-ui, "Malgun Gothic", sans-serif; margin:0; }
@@ -57,7 +58,7 @@ ol { padding-left:18px; margin:4px 0; } li { margin:4px 0; } a { color:var(--acc
 </style></head><body><main>
 <div class="card mapcard">
   <div class="hint"><button class="back" id="heonly">HE만 보기</button> 구를 누르면 그 지점의 주제를 보여 줍니다 · 끌어서 회전 · <span class="long">휠·</span>두 손가락·+/− 버튼으로 확대
-    <span class="key"><i style="background:var(--he)"></i>HE <i style="background:var(--demg)"></i>수요 <i style="background:var(--hole)"></i>주변에 HE가 없는 수요</span><span class="long"> · 범례를 누르면 점을 숨길 수 있습니다.</span></div>
+    <span class="key"><i style="background:var(--mhe)"></i>HE <i style="background:var(--mdem)"></i>수요 <i style="background:var(--mhole)"></i>주변에 HE가 없는 수요</span><span class="long"> · 범례를 누르면 점을 숨길 수 있습니다.</span></div>
   <div class="zoom"><button id="zin" aria-label="확대">+</button><button id="zout" aria-label="축소">−</button></div>
   <div id="map3"></div>
 </div>
@@ -3741,16 +3742,20 @@ function wire() {  // 연한 위도·경도 선 (위치 감을 잡는 용도)
   const put = (la, lo) => { x.push(r * Math.cos(la * rad) * Math.cos(lo * rad)); y.push(r * Math.cos(la * rad) * Math.sin(lo * rad)); z.push(r * Math.sin(la * rad)); };
   for (let lo = 0; lo < 360; lo += 30) { for (let la = -90; la <= 90; la += 5) put(la, lo); x.push(null); y.push(null); z.push(null); }
   for (let la = -60; la <= 60; la += 30) { for (let lo = 0; lo <= 360; lo += 5) put(la, lo); x.push(null); y.push(null); z.push(null); }
-  return { type: 'scatter3d', mode: 'lines', x, y, z, hoverinfo: 'skip', showlegend: false, line: { color: css('--grid3'), width: 1 } };
+  return { type: 'scatter3d', mode: 'lines', x, y, z, hoverinfo: 'skip', showlegend: false, line: { color: css('--mgrid'), width: 1 } };
 }
 const ringTrace = { type: 'scatter3d', mode: 'lines', x: [], y: [], z: [], hoverinfo: 'skip', showlegend: false,
-  line: { color: css('--fg'), width: 2 } };
+  line: { color: '#1d1d1b', width: 2 } };
 const dotTrace = { type: 'scatter3d', mode: 'markers', x: [], y: [], z: [], hoverinfo: 'skip', showlegend: false,
   marker: { size: 4, color: css('--cursor'), symbol: 'circle' } };
+// 지구본처럼 남극과 북극을 꿰는 축: 돌려도 어느 쪽이 위인지 헷갈리지 않게
+const axisTrace = { type: 'scatter3d', mode: 'lines+text', x: [0, 0], y: [0, 0], z: [-1.1, 1.1], text: ['S', 'N'],
+  textposition: ['bottom center', 'top center'], textfont: { color: css('--axis'), size: 12 },
+  hoverinfo: 'skip', showlegend: false, line: { color: css('--axis'), width: 2 } };
 const ax = { visible: false, range: [-1.1, 1.1] };
 const PAPERS = [2, 4], GLOBE = 1, RING = 5, DOT = 6;  // trace 번호
-Plotly.newPlot(gd, [wire(), globe(), pts(0, 0, '수요 논문', css('--demg')), pts(0, 1, '주변에 HE가 없는 수요 논문', css('--hole')),
-    pts(1, 0, 'HE 논문', css('--he')), ringTrace, dotTrace],
+Plotly.newPlot(gd, [wire(), globe(), pts(0, 0, '수요 논문', css('--mdem')), pts(0, 1, '주변에 HE가 없는 수요 논문', css('--mhole')),
+    pts(1, 0, 'HE 논문', css('--mhe')), ringTrace, dotTrace, axisTrace],
   { paper_bgcolor: css('--card'), font: { color: css('--fg') }, margin: { l: 0, r: 0, t: 0, b: 0 },
     showlegend: !matchMedia('(max-width:900px)').matches,  // 휴대폰에서는 범례가 세로로 길어져 구를 가린다 (색은 위 안내에)
     legend: { orientation: 'h', y: 0, itemsizing: 'constant' }, hovermode: 'closest',
@@ -3887,9 +3892,10 @@ function spot(p, clicked) {
   if (narrow() && !zoomTimer) document.getElementById('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
   document.querySelectorAll('#out [data-c]').forEach(b => b.addEventListener('click', () => card(+b.dataset.c, false, () => spot(p, clicked))));
 }
-// 지점 고르기. Plotly 3D의 plotly_click은 버튼을 누르고 있는 동안 화면을 그릴 때마다 나오고(그 안에서 다시 그리면
-// 무한 재귀), 빨리 누르면 안 나오기도 한다. 그래서 누름·뗌을 직접 보고, 그때 커서 아래의 점(plotly_hover)을 쓴다.
-let lastHover = null, lastPick = 0, down = null;
+// 지점 고르기. Plotly 3D의 plotly_click은 버튼을 누르는 순간과 누르고 있는 동안 화면을 그릴 때마다 나오고(그 안에서
+// 다시 그리면 무한 재귀, 돌리려고 누른 것도 선택이 됨), 빨리 누르면 안 나오기도 한다. 그래서 고르는 것은 뗄 때만 한다:
+// 거의 움직이지 않고 짧게 눌렀다 뗐으면 선택, 끌었으면 돌리기만. 점은 이번 누름의 plotly_click, 없으면 커서 아래의 점(plotly_hover).
+let lastHover = null, lastClick = null, lastPick = 0, down = null;
 function pick(points) {
   const q = points.find(q => q.curveNumber >= PAPERS[0] && q.curveNumber <= PAPERS[1]) || points.find(q => q.curveNumber === GLOBE);
   if (!q || Date.now() - lastPick < 400) return;
@@ -3898,13 +3904,16 @@ function pick(points) {
   setTimeout(() => spot(p, i), 0);
 }
 gd.on('plotly_hover', ev => { lastHover = { points: ev.points, t: Date.now() }; });
-gd.on('plotly_click', ev => pick(ev.points));
-gd.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: Date.now() }; }, true);
+gd.on('plotly_click', ev => { if (!lastClick) lastClick = { points: ev.points, t: Date.now() }; });  // 누른 순간의 점
+gd.addEventListener('pointerdown', e => { down = { x: e.clientX, y: e.clientY, t: Date.now() }; lastClick = null; }, true);
 gd.addEventListener('pointerup', e => {
   if (!down || pinch) { down = null; return; }
-  const still = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && Date.now() - down.t < 600;
+  const tol = e.pointerType === 'touch' ? 10 : 5;
+  const still = Math.hypot(e.clientX - down.x, e.clientY - down.y) < tol && Date.now() - down.t < 500;
   down = null;
-  if (still && lastHover && Date.now() - lastHover.t < 2000) pick(lastHover.points);
+  if (!still) return;
+  if (lastClick) pick(lastClick.points);
+  else if (lastHover && Date.now() - lastHover.t < 2000) pick(lastHover.points);
 }, true);
 let zoomTimer = null;
 gd.on('plotly_relayout', e => {
