@@ -3733,9 +3733,9 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const N = D.x.length, C = D.cards, U = D.U;  // U[k] = [문제 이름, HE가 할 일이 아니면 1]
 const link = p => p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title);
 const gd = document.getElementById('map3');
-// 주제를 셀 때의 폭 σ는 확대 정도를 따른다: 카메라가 구 표면에 가까울수록 좁게 (처음 화면에서 4°, 0.5° 단위)
+// 주제를 셀 때의 폭 σ는 확대 정도를 따른다: 카메라가 구 표면에 가까울수록 좁게 (처음 화면에서 4°, 0.5° 단위, 1°~12°)
 const EYE0 = Math.hypot(1.5, 1.5, 0.9);
-const sigFor = d => Math.max(0.5, Math.min(12, Math.round(8 * (d - 1) / (EYE0 - 1)) / 2));
+const sigFor = d => Math.max(1, Math.min(12, Math.round(8 * (d - 1) / (EYE0 - 1)) / 2));  // 1° 아래로는 안 줄인다: 원이 논문 점(0.65°)보다 작아지지 않게
 const START = matchMedia('(max-width:900px)').matches ? { x: 1.2, y: 1.2, z: 0.72 } : { x: 1.5, y: 1.5, z: 0.9 };  // 휴대폰은 구를 크게
 let SIG = sigFor(Math.hypot(START.x, START.y, START.z)), cur = null, markP = null, view = 'list';  // cur: 누른 지점 {p: 방향, i: 누른 논문 번호 또는 null}
 const cardOf = {}; C.forEach((c, i) => { if (c.u != null) cardOf[c.u] = i; });
@@ -3854,7 +3854,7 @@ function ring(p, withCircle = true) {  // 누른 지점 표시: 작은 점 + 주
     for (let s = 0; s <= n; s++) { const f = 2 * Math.PI * s / n;
       for (let q = 0; q < 3; q++) o[q].push(r * (c * p[q] + d * (Math.cos(f) * u[q] + Math.sin(f) * v[q]))); }
     return o; };
-  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(SIG * 0.175, DOTN, 1.004);  // 분홍 점도 원과 같이 줄고 늘어 비율이 늘 같다 (처음 화면 4° 원에 0.7° 점)
+  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(DISC, DOTN, 1.004);  // 분홍 점은 논문 점과 같은 크기 (화면에서는 확대에 따라 함께 커지고 작아진다)
   dx.push(1.004 * p[0]); dy.push(1.004 * p[1]); dz.push(1.004 * p[2]);  // 원판: 가운데 점과 둘레로 부채꼴
   const fi = [], fj = [], fk = []; for (let s = 0; s < DOTN; s++) { fi.push(DOTN + 1); fj.push(s); fk.push(s + 1); }
   Plotly.restyle(gd, withCircle ? { x: [x], y: [y], z: [z] } : { x: [[]], y: [[]], z: [[]] }, [RING]);
