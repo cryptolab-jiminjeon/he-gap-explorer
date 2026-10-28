@@ -3822,7 +3822,7 @@ function syncCam() {
 const eyeLen = () => { const e = eye(); return Math.hypot(e.x, e.y, e.z); };
 function zoomTo(len, toward) {  // 거리만 바꾼다 (구 안으로 들어가지 않게). toward가 있으면 그 지점을 앞으로
   const e = toward ? { x: toward[0], y: toward[1], z: toward[2] } : eye(), n = Math.hypot(e.x, e.y, e.z) || 1;
-  const k = Math.max(1.15, Math.min(4, len)) / n;
+  const k = Math.max(1.02, Math.min(8, len)) / n;
   Plotly.relayout(gd, { 'scene.camera.eye': { x: e.x * k, y: e.y * k, z: e.z * k } });
 }
 document.getElementById('zin').addEventListener('click', () => zoomTo(1 + (eyeLen() - 1) / 1.4, markP));
@@ -4064,16 +4064,26 @@ gd.addEventListener('pointermove', e => {  // 마우스 아래 논문 제목
 });
 gd.addEventListener('pointerleave', () => { cancelAnimationFrame(hoverFrame); tip.style.display = 'none'; });
 let zoomTimer = null;
-function onCam() {  // 카메라가 바뀐 뒤: 구 안으로 들어가거나 너무 멀어지면 +/− 버튼과 같은 범위로, 확대 정도에 맞춰 σ
+function onCam() {  // 카메라가 바뀐 뒤: 지금 카메라를 적어 두고 확대 정도에 맞춰 σ (크기는 사용자가 정한 그대로 둔다)
   const L = eyeLen();
-  if (L < 1.15 || L > 4) { zoomTo(L); return; }
   syncCam();
   const r = sigFor(L); if (r === SIG) return;
   SIG = r; clearTimeout(zoomTimer);
   zoomTimer = setTimeout(() => { if (view === 'spot' && cur) spot(cur.p, cur.i); else if (markP) ring(markP); zoomTimer = null; }, 150);
 }
 gd.on('plotly_relayout', e => { if (Object.keys(e).some(k => k.startsWith('scene.camera'))) onCam(); });
-let wheelTimer = null;  // 휠 확대는 relayout이 확대가 끝나기 전에 한 번만 나와서, 휠이 멈춘 뒤 다시 본다
-gd.addEventListener('wheel', () => { clearTimeout(wheelTimer); wheelTimer = setTimeout(onCam, 250); }, { passive: true, capture: true });
+// 휠 확대는 직접 한다: Plotly 3D의 휠 확대는 한 칸에 몇 배씩 움직여 구 안(0.7)이나 아주 멀리(100)까지 튀었다.
+// 한 칸마다 표면까지 거리(eye-1)를 조금씩 곱해, 표면에 다가갈 뿐 구 안으로는 들어가지 않는다 (+/− 버튼과 같은 방식).
+let wheelAcc = 0, wheelFrame = 0;
+gd.addEventListener('wheel', e => {
+  e.preventDefault(); e.stopPropagation();
+  wheelAcc += e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+  if (wheelFrame) return;
+  wheelFrame = requestAnimationFrame(() => {
+    const L = eyeLen();
+    zoomTo(1 + (L - 1) * Math.exp(Math.max(-1, Math.min(1, wheelAcc * 0.0015))));
+    wheelAcc = 0; wheelFrame = 0;
+  });
+}, { passive: false, capture: true });
 list();
 </script></body></html>
