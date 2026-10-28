@@ -3854,7 +3854,7 @@ function ring(p, withCircle = true) {  // 누른 지점 표시: 작은 점 + 주
     for (let s = 0; s <= n; s++) { const f = 2 * Math.PI * s / n;
       for (let q = 0; q < 3; q++) o[q].push(r * (c * p[q] + d * (Math.cos(f) * u[q] + Math.sin(f) * v[q]))); }
     return o; };
-  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(0.7, DOTN, 1.004);
+  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(SIG * 0.175, DOTN, 1.004);  // 분홍 점도 원과 같이 줄고 늘어 비율이 늘 같다 (처음 화면 4° 원에 0.7° 점)
   dx.push(1.004 * p[0]); dy.push(1.004 * p[1]); dz.push(1.004 * p[2]);  // 원판: 가운데 점과 둘레로 부채꼴
   const fi = [], fj = [], fk = []; for (let s = 0; s < DOTN; s++) { fi.push(DOTN + 1); fj.push(s); fk.push(s + 1); }
   Plotly.restyle(gd, withCircle ? { x: [x], y: [y], z: [z] } : { x: [[]], y: [[]], z: [[]] }, [RING]);
