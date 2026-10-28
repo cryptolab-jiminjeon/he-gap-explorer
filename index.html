@@ -3733,9 +3733,12 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 const N = D.x.length, C = D.cards, U = D.U;  // U[k] = [문제 이름, HE가 할 일이 아니면 1]
 const link = p => p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title);
 const gd = document.getElementById('map3');
-// 주제를 셀 때의 폭 σ는 확대 정도를 따른다: 카메라가 구 표면에 가까울수록 좁게 (처음 화면에서 4°, 0.5° 단위, 1°~12°)
+// 주제를 셀 때의 폭 σ는 확대 정도를 따른다: 카메라가 구 표면에 가까울수록 좁게 (처음 화면에서 4°, 0.1° 단위)
 const EYE0 = Math.hypot(1.5, 1.5, 0.9);
-const sigFor = d => Math.max(1, Math.min(12, Math.round(8 * (d - 1) / (EYE0 - 1)) / 2));  // 1° 아래로는 안 줄인다: 원이 논문 점(0.65°)보다 작아지지 않게
+// 카메라 단위에서 구 반지름: 축 범위 ±1.1인 상자가 카메라 단위로 ±0.5라 1/2.2 (점 크기를 화면에서 재어 확인).
+// 확대·σ·점 크기는 모두 카메라에서 구 표면까지의 거리(eye - SR)를 기준으로 한다.
+const SR = 1.002 / 2.2;
+const sigFor = d => Math.max(0.1, Math.min(12, Math.round(40 * (d - SR) / (EYE0 - SR)) / 10));
 const START = matchMedia('(max-width:900px)').matches ? { x: 1.2, y: 1.2, z: 0.72 } : { x: 1.5, y: 1.5, z: 0.9 };  // 휴대폰은 구를 크게
 let SIG = sigFor(Math.hypot(START.x, START.y, START.z)), cur = null, markP = null, view = 'list';  // cur: 누른 지점 {p: 방향, i: 누른 논문 번호 또는 null}
 const cardOf = {}; C.forEach((c, i) => { if (c.u != null) cardOf[c.u] = i; });
@@ -3744,27 +3747,39 @@ const norm = p => { const n = Math.hypot(p[0], p[1], p[2]) || 1; return [p[0] / 
 const P = D.x.map((_, i) => norm([D.x[i], D.y[i], D.z[i]]));  // 소수점 반올림으로 길이가 1에서 조금 벗어나 있다
 
 // 논문은 떠 있는 점이 아니라 구 표면에 붙은 작은 원판으로 그린다 (지구본에 인쇄된 점처럼 매끈하게)
-const RAD = Math.PI / 180, DISC = 0.65, DSIDE = 10;  // 원판 반지름(°)과 변 수
+const RAD = Math.PI / 180, DISC = 0.65, DSIDE = 6;  // 원판 반지름(°)과 변 수 (화면에서 몇 픽셀이라 육각형이면 충분, 다시 그리기가 빨라짐)
 const kindOf = i => D.g[i] ? 2 : D.h[i] ? 1 : 0;  // 1(주변 HE가 드문 수요)도 수요와 같은 색으로 그린다
 const tangent = p => {  // p에 수직인 두 단위 벡터
   const t = Math.abs(p[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const u = norm([p[1] * t[2] - p[2] * t[1], p[2] * t[0] - p[0] * t[2], p[0] * t[1] - p[1] * t[0]]);
   return [u, [p[1] * u[2] - p[2] * u[1], p[2] * u[0] - p[0] * u[2], p[0] * u[1] - p[1] * u[0]]];
 };
-function discs(kind, name, color) {
-  const x = [], y = [], z = [], i = [], j = [], k = [], r = 1.002, c = Math.cos(DISC * RAD), d = Math.sin(DISC * RAD);
+// 원판 반지름은 확대 정도를 따른다: 지도 앱처럼 화면에서 점 크기가 거의 같고, 확대하면 촘촘한 점이 떨어져 보인다.
+// 처음 화면에서 DISC(0.65°), 카메라에서 구 표면까지 거리에 비례해 줄고 는다 (화면에서는 늘 비슷한 크기).
+let DOT_DEG = DISC;
+const discXYZ = (kind, deg) => {
+  const x = [], y = [], z = [], r = 1.002, c = Math.cos(deg * RAD), d = Math.sin(deg * RAD);
   for (let n = 0; n < N; n++) {
     if (kindOf(n) !== kind) continue;
-    const p = P[n], [u, v] = tangent(p), o = x.length;
+    const p = P[n], [u, v] = tangent(p);
     x.push(r * p[0]); y.push(r * p[1]); z.push(r * p[2]);
     for (let s = 0; s < DSIDE; s++) {
       const f = 2 * Math.PI * s / DSIDE, cf = Math.cos(f), sf = Math.sin(f);
       x.push(r * (c * p[0] + d * (cf * u[0] + sf * v[0]))); y.push(r * (c * p[1] + d * (cf * u[1] + sf * v[1]))); z.push(r * (c * p[2] + d * (cf * u[2] + sf * v[2])));
-      i.push(o); j.push(o + 1 + s); k.push(o + 1 + (s + 1) % DSIDE);
     }
   }
-  return { type: 'mesh3d', name, x, y, z, i, j, k, color, opacity: 1, hoverinfo: 'none', showlegend: false, flatshading: true,
-    lighting: { ambient: 1, diffuse: 0, specular: 0, roughness: 1, fresnel: 0 } };
+  return { x, y, z };
+};
+function discs(kind, name, color) {
+  const i = [], j = [], k = [];
+  let o = 0;
+  for (let n = 0; n < N; n++) {
+    if (kindOf(n) !== kind) continue;
+    for (let s = 0; s < DSIDE; s++) { i.push(o); j.push(o + 1 + s); k.push(o + 1 + (s + 1) % DSIDE); }
+    o += DSIDE + 1;
+  }
+  return { type: 'mesh3d', name, ...discXYZ(kind, DOT_DEG), i, j, k, color, opacity: 1, hoverinfo: 'none', showlegend: false,
+    flatshading: true, lighting: { ambient: 1, diffuse: 0, specular: 0, roughness: 1, fresnel: 0 } };
 }
 function globe() {  // 불투명한 흰 구: 뒤쪽 반구가 비쳐 보이지 않게, 빈 곳을 눌러도 지점을 고를 수 있게
   const x = [], y = [], z = [], i = [], j = [], k = [], L = 90, M = 180;
@@ -3821,11 +3836,11 @@ function syncCam() {
 const eyeLen = () => { const e = eye(); return Math.hypot(e.x, e.y, e.z); };
 function zoomTo(len, toward) {  // 거리만 바꾼다 (구 안으로 들어가지 않게). toward가 있으면 그 지점을 앞으로
   const e = toward ? { x: toward[0], y: toward[1], z: toward[2] } : eye(), n = Math.hypot(e.x, e.y, e.z) || 1;
-  const k = Math.max(1.02, Math.min(8, len)) / n;
+  const k = Math.max(SR + 0.02, Math.min(8, len)) / n;
   Plotly.relayout(gd, { 'scene.camera.eye': { x: e.x * k, y: e.y * k, z: e.z * k } });
 }
-document.getElementById('zin').addEventListener('click', () => zoomTo(1 + (eyeLen() - 1) / 1.4, markP));
-document.getElementById('zout').addEventListener('click', () => zoomTo(1 + (eyeLen() - 1) * 1.4, markP));
+document.getElementById('zin').addEventListener('click', () => zoomTo(SR + (eyeLen() - SR) / 1.4, markP));
+document.getElementById('zout').addEventListener('click', () => zoomTo(SR + (eyeLen() - SR) * 1.4, markP));
 // 휴대폰: Plotly 3D는 두 손가락 확대를 지원하지 않아 직접 처리한다
 let pinch = null, pinchFrame = 0;
 const span = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1;
@@ -3836,7 +3851,7 @@ gd.addEventListener('touchstart', e => {
 gd.addEventListener('touchmove', e => {
   if (!pinch || e.touches.length !== 2) return;
   e.preventDefault(); e.stopPropagation();
-  const len = 1 + (pinch.len - 1) * pinch.d / span(e.touches);
+  const len = SR + (pinch.len - SR) * pinch.d / span(e.touches);
   cancelAnimationFrame(pinchFrame); pinchFrame = requestAnimationFrame(() => zoomTo(len));
 }, { passive: false, capture: true });
 gd.addEventListener('touchend', e => { if (pinch && e.touches.length < 2) { pinch = null; e.stopPropagation(); } }, { capture: true });
@@ -3844,6 +3859,13 @@ const narrow = () => matchMedia('(max-width:900px)').matches;
 function face(p) {  // 지구본을 돌려 그 자리가 앞으로 오게 (확대 정도는 그대로)
   const n = Math.hypot(p[0], p[1], p[2]) || 1, k = eyeLen() / n;
   Plotly.relayout(gd, { 'scene.camera': { eye: { x: p[0] * k, y: p[1] * k, z: p[2] * k }, center: { x: 0, y: 0, z: 0 }, up: { x: 0, y: 0, z: 1 } } });
+}
+function dotXYZ(p) {  // 분홍 점(원판): 둘레 DOTN+1개 + 가운데
+  const [u, v] = tangent(p), a = DOT_DEG * RAD, c = Math.cos(a), d = Math.sin(a), o = [[], [], []];
+  for (let s = 0; s <= DOTN; s++) { const f = 2 * Math.PI * s / DOTN;
+    for (let q = 0; q < 3; q++) o[q].push(1.004 * (c * p[q] + d * (Math.cos(f) * u[q] + Math.sin(f) * v[q]))); }
+  for (let q = 0; q < 3; q++) o[q].push(1.004 * p[q]);
+  return { x: o[0], y: o[1], z: o[2] };
 }
 let ringOn = true;  // 논문 하나를 고르면 셀 범위의 원은 그리지 않는다 (점 표시만)
 function ring(p, withCircle = true) {  // 누른 지점 표시: 작은 점 + 주제를 셀 때 가중치가 큰 범위(σ)의 옅은 원
@@ -3854,7 +3876,7 @@ function ring(p, withCircle = true) {  // 누른 지점 표시: 작은 점 + 주
     for (let s = 0; s <= n; s++) { const f = 2 * Math.PI * s / n;
       for (let q = 0; q < 3; q++) o[q].push(r * (c * p[q] + d * (Math.cos(f) * u[q] + Math.sin(f) * v[q]))); }
     return o; };
-  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(DISC, DOTN, 1.004);  // 분홍 점은 논문 점과 같은 크기 (화면에서는 확대에 따라 함께 커지고 작아진다)
+  const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(DOT_DEG, DOTN, 1.004);  // 분홍 점은 논문 점과 같은 크기
   dx.push(1.004 * p[0]); dy.push(1.004 * p[1]); dz.push(1.004 * p[2]);  // 원판: 가운데 점과 둘레로 부채꼴
   const fi = [], fj = [], fk = []; for (let s = 0; s < DOTN; s++) { fi.push(DOTN + 1); fj.push(s); fk.push(s + 1); }
   Plotly.restyle(gd, withCircle ? { x: [x], y: [y], z: [z] } : { x: [[]], y: [[]], z: [[]] }, [RING]);
@@ -4048,7 +4070,7 @@ function surfaceAt(cx, cy) {  // 화면 좌표 → 구 표면의 방향 (구를 
   return norm([a[0] + t * d[0], a[1] + t * d[1], a[2] + t * d[2]]);
 }
 function paperAt(p) {  // 그 자리의 원판 논문 (없으면 null)
-  let bi = null, bc = Math.cos(1.3 * DISC * RAD);
+  let bi = null, bc = Math.cos(1.3 * DOT_DEG * RAD);
   for (let i = 0; i < N; i++) { if (heOnly && !D.g[i]) continue; const c = dot(P[i], p); if (c > bc) { bc = c; bi = i; } }
   return bi;
 }
@@ -4081,9 +4103,20 @@ gd.addEventListener('pointermove', e => {  // 마우스 아래 논문 제목
 });
 gd.addEventListener('pointerleave', () => { cancelAnimationFrame(hoverFrame); tip.style.display = 'none'; });
 let zoomTimer = null;
-function onCam() {  // 카메라가 바뀐 뒤: 지금 카메라를 적어 두고 확대 정도에 맞춰 σ (크기는 사용자가 정한 그대로 둔다)
+let dotTimer = null;
+function resizeDots() {  // 확대가 멈추면 논문 점과 분홍 점을 확대 정도에 맞는 크기로 다시 그린다
+  // 화면 크기는 카메라~구 표면 거리에 반비례하므로 표면 위 크기를 그 거리에 비례시키면 화면에서는 늘 같다
+  const deg = Math.max(0.002, Math.min(3, DISC * (eyeLen() - SR) / (Math.hypot(START.x, START.y, START.z) - SR)));
+  if (Math.abs(deg - DOT_DEG) < 0.05 * DOT_DEG) return;
+  DOT_DEG = deg; syncCam();
+  const c = [0, 1, 2].map(k => discXYZ(k, deg)), traces = [DEM[0], DEM[1], DEM[1] + 1];
+  if (markP && gd.data[DOT].visible) { c.push(dotXYZ(markP)); traces.push(DOT); }  // 분홍 점도 같은 번에 (다시 그리기는 한 번)
+  Plotly.restyle(gd, { x: c.map(a => a.x), y: c.map(a => a.y), z: c.map(a => a.z) }, traces);
+}
+function onCam() {  // 카메라가 바뀐 뒤: 지금 카메라를 적어 두고 확대 정도에 맞춰 σ와 점 크기 (크기는 사용자가 정한 그대로 둔다)
   const L = eyeLen();
   syncCam();
+  clearTimeout(dotTimer); dotTimer = setTimeout(resizeDots, 120);
   const r = sigFor(L); if (r === SIG) return;
   SIG = r; clearTimeout(zoomTimer);
   zoomTimer = setTimeout(() => { if (view === 'spot' && cur) spot(cur.p, cur.i); else if (markP) ring(markP, ringOn); zoomTimer = null; }, 150);
@@ -4098,7 +4131,7 @@ gd.addEventListener('wheel', e => {
   if (wheelFrame) return;
   wheelFrame = requestAnimationFrame(() => {
     const L = eyeLen();
-    zoomTo(1 + (L - 1) * Math.exp(Math.max(-1, Math.min(1, wheelAcc * 0.0015))));
+    zoomTo(SR + (L - SR) * Math.exp(Math.max(-1, Math.min(1, wheelAcc * 0.0015))));
     wheelAcc = 0; wheelFrame = 0;
   });
 }, { passive: false, capture: true });
