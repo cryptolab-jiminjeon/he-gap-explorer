@@ -83,7 +83,7 @@ ul.plain { list-style:none; padding:0; margin:4px 0; } ul.plain li { margin:3px 
 </style></head><body><main>
 <div class="card mapcard">
   <div class="hint"><button class="back" id="heonly">HE만 보기</button> 누르기: 그 지점의 주제 · 끌기: 회전 · <span class="long">휠·</span>+/−: 확대
-    <span class="key"><i style="background:var(--mhe)"></i>HE <i style="background:var(--mdem)"></i>수요 <i style="background:var(--mhole)"></i>주변에 HE가 없는 수요</span></div>
+    <span class="key"><i style="background:var(--mhe)"></i>HE <i style="background:var(--mdem)"></i>수요</span></div>
   <div class="zoom"><button id="zin" aria-label="확대">+</button><button id="zout" aria-label="축소">−</button></div>
   <div id="map3"></div><div class="tip" id="tip"></div>
 </div>
@@ -92,15 +92,14 @@ ul.plain { list-style:none; padding:0; margin:4px 0; } ul.plain li { margin:3px 
   <div class="meta">논문 17,431편 · <span class="he">HE 5,248</span> · 수요 12,183 — 가까운 점일수록 비슷한 문제</div>
   <div id="out"></div>
   <details class="more"><summary>이 지도를 만든 방법</summary>
-  <div class="meta">논문을 기술(HE·차분 프라이버시·연합학습…)을 뺀 “무슨 문제인가”로 구 표면에 펼쳤습니다. 파란 점은 HE 논문, 회색·주황 점은 다른 프라이버시 기술로 같은 문제를 푼 수요 논문이고, 파란 점이 없는 주황 구역이 “수요는 있는데 HE 연구가 안 온 곳”입니다.<br>
+  <div class="meta">논문을 기술(HE·차분 프라이버시·연합학습…)을 뺀 “무슨 문제인가”로 구 표면에 펼쳤습니다. 파란 점은 HE 논문, 회색 점은 다른 프라이버시 기술로 같은 문제를 푼 수요 논문이고, 파란 점이 없는 회색 구역이 “수요는 있는데 HE 연구가 안 온 곳”입니다.<br>
     ① 논문마다 LLM(Qwen3-8B)이 기술 이름을 빼고 문제만 한 문장으로 다시 썼습니다 (누가 어떤 데이터를 갖고, 무엇을 계산·공유하며, 무엇을 누구에게 숨겨야 하는지).
     ② 그 문장과 데이터 분야·연산·참여 구조로 임베딩했습니다(BGE-M3). 같은 문제를 다룬 HE 논문과 수요 논문이 가까이 놓입니다 (HE 논문의 가장 가까운 논문이 HE인 비율: 예전 지도 91% → 65%).
     ③ 지도의 모양은 수요 논문만으로 정했습니다: 3차원으로 줄여(UMAP) 중심에서 본 방향만 남겨 구 표면에 펼쳤고, HE 논문은 문제가 비슷한 수요 논문 자리에 얹었습니다. 그래서 파란 점이 없는 표면이 HE가 안 온 곳입니다.
-    구 표면에서 가까운 논문 50편 중 HE가 5% 이하인 수요 논문을 주황으로 칠했습니다 (수요 논문의 12%). 원래 임베딩 공간에서도 이 논문들의 가까운 논문 10편 중 HE는 8%로, 나머지 수요 논문(24%)보다 훨씬 적습니다.
-    주황 구역은 아직 시간 검증을 하지 않았습니다.
+    이 빈 곳이 지도에서만 생긴 착시가 아닌지 확인했습니다: 구 표면에서 가까운 논문 50편 중 HE가 5% 이하인 수요 논문(수요 논문의 12%)은 원래 임베딩 공간에서도 가까운 논문 10편 중 HE가 8%로, 나머지 수요 논문(24%)보다 훨씬 적습니다. 시간 검증은 아직 하지 않았습니다.
     ④ 지점을 누르면 그 주변 논문을 가까울수록 크게(가우스 가중치, 폭은 확대 정도를 따름) 데이터 분야·연산·참여 구조별로 세어, 각각 가장 큰 것을 이어 그 지점의 주제로 보여 줍니다 (예: "여러 당사자가 나눠 가진 공공 통계 데이터의 집계·합산"). 같은 가중치로 세부 과제(LLM이 논문마다 뽑은 응용 · 모델, 비슷한 응용 이름은 묶음)와 제목·초록의 핵심어(TF-IDF, 기술 이름은 뺌)도 셉니다. 세부 과제마다 그 지점의 HE 비율과 전체 논문 중 HE 편수를 함께 보여 줍니다. 분야·연산·참여 구조는 LLM이 논문에서 뽑은 값입니다.
     ⑤ HE 공백 문제는 전체 논문을 같은 단위로 센 것입니다: 수요 논문이 5편 이상인데 HE 논문은 0편이고, HE로 풀 만한 문제(결과를 공개 배포하거나 인증·접근 제어처럼 HE가 할 일이 아닌 문제는 뺌)를 고른 뒤,
-    라벨이 틀렸을 수 있으므로 문제 공간에서 한 번 더 확인했습니다: 그 문제의 수요 논문마다 가장 가까운 논문 10편 중 HE 논문 비율이 평균의 절반 이하일 때만 공백으로 확정하고, 아니면 “비슷한 HE 연구 있음”으로 표시합니다. 주황 구역과는 기준이 달라서 늘 겹치지는 않습니다.
+    라벨이 틀렸을 수 있으므로 문제 공간에서 한 번 더 확인했습니다: 그 문제의 수요 논문마다 가장 가까운 논문 10편 중 HE 논문 비율이 평균의 절반 이하일 때만 공백으로 확정하고, 아니면 “비슷한 HE 연구 있음”으로 표시합니다.
     ⑥ 시간 검증: 2022년까지의 논문만으로 같은 규칙을 적용하면 확정 공백이 14개였고, 그중 71%에 2023~2026년 HE 논문이 실제로 나왔습니다 (비슷한 HE 연구가 있던 문제는 60%, 수요가 적거나 HE에 안 맞아 뺀 나머지 HE 0편 문제는 23%).
     ⑦ 새 HE 연구 주제: 프라이버시 기술 없이 민감한 데이터(의료·유전체·금융·생체·에너지·채용·광고 등)로 계산하는 2022~2026년 논문 1만여 편에서 LLM(Qwen3-14B)이 구체 과제(모델 × 응용)를 뽑고, 같은 과제의 HE 논문이 있는지 문장 비교 모델(bge-reranker)로 판정했습니다. 남은 후보는 응용별로 묶어 외부 논문 검색으로 다시 확인하고, 상위 결과를 직접 읽어 공백·부분 공백을 정했습니다.
     분야·연산·참여 구조와 세부 과제는 LLM이 논문에서 뽑은 값이라 틀린 것이 섞여 있을 수 있습니다. 새 HE 주제의 근거 논문은 프라이버시 기술을 쓰지 않아 구 지도에는 없고, 외부 확인은 제목·초록 검색이라 본문에서만 HE를 쓴 논문은 놓쳤을 수 있습니다.</div></details>
@@ -3746,7 +3745,7 @@ const P = D.x.map((_, i) => norm([D.x[i], D.y[i], D.z[i]]));  // 소수점 반�
 
 // 논문은 떠 있는 점이 아니라 구 표면에 붙은 작은 원판으로 그린다 (지구본에 인쇄된 점처럼 매끈하게)
 const RAD = Math.PI / 180, DISC = 0.65, DSIDE = 10;  // 원판 반지름(°)과 변 수
-const kindOf = i => D.g[i] ? 2 : D.h[i] ? 1 : 0;
+const kindOf = i => D.g[i] ? 2 : D.h[i] ? 1 : 0;  // 1(주변 HE가 드문 수요)도 수요와 같은 색으로 그린다
 const tangent = p => {  // p에 수직인 두 단위 벡터
   const t = Math.abs(p[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
   const u = norm([p[1] * t[2] - p[2] * t[1], p[2] * t[0] - p[0] * t[2], p[0] * t[1] - p[1] * t[0]]);
@@ -3799,7 +3798,7 @@ const axisTrace = { type: 'scatter3d', mode: 'lines+text', x: [0, 0], y: [0, 0],
   hoverinfo: 'skip', showlegend: false, line: { color: css('--axis'), width: 2 } };
 const ax = { visible: false, range: [-1.1, 1.1] };
 const DEM = [2, 3], RING = 5, DOT = 6;  // trace 번호 (0 선, 1 구, 2·3 수요, 4 HE, 7 축)
-Plotly.newPlot(gd, [wire(), globe(), discs(0, '수요 논문', css('--mdem')), discs(1, '주변에 HE가 없는 수요 논문', css('--mhole')),
+Plotly.newPlot(gd, [wire(), globe(), discs(0, '수요 논문', css('--mdem')), discs(1, '수요 논문', css('--mdem')),
     discs(2, 'HE 논문', css('--mhe')), ringTrace, dotTrace, axisTrace],
   { paper_bgcolor: css('--card'), font: { color: css('--fg') }, margin: { l: 0, r: 0, t: 0, b: 0 },
     showlegend: false, hovermode: false,  // 색은 위 안내에, 마우스 아래 논문은 직접 찾는다
@@ -3977,7 +3976,7 @@ function spot(p, clicked) {
       <span class="n">HE ${nh}/${nd + nh}</span><div class="bar"><i class="d" style="width:${(100 * d / tmax).toFixed(1)}%"></i><i class="h" style="width:${(100 * h / tmax).toFixed(1)}%"></i></div></div>`;
   };
   const nearAll = [...nearest(0, 3), ...nearest(1, 2)].sort((a, b) => dot(P[b], p) - dot(P[a], p));
-  const prow = i => `<li><span class="dot" style="background:${D.g[i] ? 'var(--mhe)' : D.h[i] ? 'var(--mhole)' : 'var(--mdem)'}"></span>${link({ title: D.t[i], url: D.u[i] })} <span class="meta">${D.yr[i]} · ${deg(i)}°</span></li>`;
+  const prow = i => `<li><span class="dot" style="background:${D.g[i] ? 'var(--mhe)' : 'var(--mdem)'}"></span>${link({ title: D.t[i], url: D.u[i] })} <span class="meta">${D.yr[i]} · ${deg(i)}°</span></li>`;
   const top = units[0];
   document.getElementById('out').innerHTML = `<p><button class="back" id="back">← 목록</button></p>
     <div class="region"><div class="meta">이 지점</div>
