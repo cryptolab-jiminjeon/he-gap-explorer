@@ -3809,10 +3809,16 @@ Plotly.newPlot(gd, [wire(), globe(), discs(0, '수요 논문', css('--mdem')), d
 let heOnly = false;
 document.getElementById('heonly').addEventListener('click', e => {
   heOnly = !heOnly; e.target.textContent = heOnly ? '수요 논문도 보기' : 'HE만 보기';
-  Plotly.restyle(gd, { visible: !heOnly }, DEM);
+  syncCam(); Plotly.restyle(gd, { visible: !heOnly }, DEM);
 });
 const eye = () => { const sc = gd._fullLayout.scene, live = sc._scene && sc._scene.getCamera ? sc._scene.getCamera() : null;
   return (live || sc.camera).eye; };
+// 휠·끌기로 바꾼 카메라는 3D 화면에만 있고 layout에는 안 남는다. 그대로 restyle하면 Plotly가 layout의 카메라(처음 크기)로
+// 되돌리므로, 다시 그리기 전에 지금 카메라를 layout에 적어 둔다.
+function syncCam() {
+  const sc = gd._fullLayout.scene._scene;
+  if (sc && sc.getCamera) { const c = sc.getCamera(); gd.layout.scene.camera = { eye: c.eye, center: c.center, up: c.up }; }
+}
 const eyeLen = () => { const e = eye(); return Math.hypot(e.x, e.y, e.z); };
 function zoomTo(len, toward) {  // 거리만 바꾼다 (구 안으로 들어가지 않게). toward가 있으면 그 지점을 앞으로
   const e = toward ? { x: toward[0], y: toward[1], z: toward[2] } : eye(), n = Math.hypot(e.x, e.y, e.z) || 1;
@@ -3841,7 +3847,7 @@ function face(p) {  // 지구본을 돌려 그 자리가 앞으로 오게 (확�
   Plotly.relayout(gd, { 'scene.camera': { eye: { x: p[0] * k, y: p[1] * k, z: p[2] * k }, center: { x: 0, y: 0, z: 0 }, up: { x: 0, y: 0, z: 1 } } });
 }
 function ring(p) {  // 누른 지점 표시: 작은 점 + 주제를 셀 때 가중치가 큰 범위(σ)의 옅은 원
-  markP = p;
+  markP = p; syncCam();
   if (!p) { Plotly.restyle(gd, { x: [[]], y: [[]], z: [[]] }, [RING]); Plotly.restyle(gd, { visible: false }, [DOT]); return; }
   const [u, v] = tangent(p);
   const circle = (deg, n, r) => { const a = deg * RAD, c = Math.cos(a), d = Math.sin(a), o = [[], [], []];
@@ -4058,11 +4064,16 @@ gd.addEventListener('pointermove', e => {  // 마우스 아래 논문 제목
 });
 gd.addEventListener('pointerleave', () => { cancelAnimationFrame(hoverFrame); tip.style.display = 'none'; });
 let zoomTimer = null;
-gd.on('plotly_relayout', e => {
-  if (!Object.keys(e).some(k => k.startsWith('scene.camera'))) return;
-  const r = sigFor(eyeLen()); if (r === SIG) return;
+function onCam() {  // 카메라가 바뀐 뒤: 구 안으로 들어가거나 너무 멀어지면 +/− 버튼과 같은 범위로, 확대 정도에 맞춰 σ
+  const L = eyeLen();
+  if (L < 1.15 || L > 4) { zoomTo(L); return; }
+  syncCam();
+  const r = sigFor(L); if (r === SIG) return;
   SIG = r; clearTimeout(zoomTimer);
   zoomTimer = setTimeout(() => { if (view === 'spot' && cur) spot(cur.p, cur.i); else if (markP) ring(markP); zoomTimer = null; }, 150);
-});
+}
+gd.on('plotly_relayout', e => { if (Object.keys(e).some(k => k.startsWith('scene.camera'))) onCam(); });
+let wheelTimer = null;  // 휠 확대는 relayout이 확대가 끝나기 전에 한 번만 나와서, 휠이 멈춘 뒤 다시 본다
+gd.addEventListener('wheel', () => { clearTimeout(wheelTimer); wheelTimer = setTimeout(onCam, 250); }, { passive: true, capture: true });
 list();
 </script></body></html>
