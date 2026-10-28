@@ -82,7 +82,7 @@ ul.plain { list-style:none; padding:0; margin:4px 0; } ul.plain li { margin:3px 
   #out { scroll-margin-top:calc(56vh + 8px); } .hint { font-size:10px; } .long { display:none; } }
 </style></head><body><main>
 <div class="card mapcard">
-  <div class="hint"><button class="back" id="heonly">HE만 보기</button> 누르기: 그 지점의 주제 · 끌기: 회전 · <span class="long">휠·</span>+/−: 확대
+  <div class="hint"><button class="back" id="heonly">HE만 보기</button> 점 누르기: 그 논문 · 빈 곳: 그 주변 · 끌기: 회전 · <span class="long">휠·</span>+/−: 확대
     <span class="key"><i style="background:var(--mhe)"></i>HE <i style="background:var(--mdem)"></i>수요</span></div>
   <div class="zoom"><button id="zin" aria-label="확대">+</button><button id="zout" aria-label="축소">−</button></div>
   <div id="map3"></div><div class="tip" id="tip"></div>
@@ -3845,8 +3845,9 @@ function face(p) {  // 지구본을 돌려 그 자리가 앞으로 오게 (확�
   const n = Math.hypot(p[0], p[1], p[2]) || 1, k = eyeLen() / n;
   Plotly.relayout(gd, { 'scene.camera': { eye: { x: p[0] * k, y: p[1] * k, z: p[2] * k }, center: { x: 0, y: 0, z: 0 }, up: { x: 0, y: 0, z: 1 } } });
 }
-function ring(p) {  // 누른 지점 표시: 작은 점 + 주제를 셀 때 가중치가 큰 범위(σ)의 옅은 원
-  markP = p; syncCam();
+let ringOn = true;  // 논문 하나를 고르면 셀 범위의 원은 그리지 않는다 (점 표시만)
+function ring(p, withCircle = true) {  // 누른 지점 표시: 작은 점 + 주제를 셀 때 가중치가 큰 범위(σ)의 옅은 원
+  markP = p; ringOn = withCircle; syncCam();
   if (!p) { Plotly.restyle(gd, { x: [[]], y: [[]], z: [[]] }, [RING]); Plotly.restyle(gd, { visible: false }, [DOT]); return; }
   const [u, v] = tangent(p);
   const circle = (deg, n, r) => { const a = deg * RAD, c = Math.cos(a), d = Math.sin(a), o = [[], [], []];
@@ -3856,7 +3857,7 @@ function ring(p) {  // 누른 지점 표시: 작은 점 + 주제를 셀 때 가�
   const [x, y, z] = circle(SIG, 72, 1.003), [dx, dy, dz] = circle(0.7, DOTN, 1.004);
   dx.push(1.004 * p[0]); dy.push(1.004 * p[1]); dz.push(1.004 * p[2]);  // 원판: 가운데 점과 둘레로 부채꼴
   const fi = [], fj = [], fk = []; for (let s = 0; s < DOTN; s++) { fi.push(DOTN + 1); fj.push(s); fk.push(s + 1); }
-  Plotly.restyle(gd, { x: [x], y: [y], z: [z] }, [RING]);
+  Plotly.restyle(gd, withCircle ? { x: [x], y: [y], z: [z] } : { x: [[]], y: [[]], z: [[]] }, [RING]);
   Plotly.restyle(gd, { x: [dx], y: [dy], z: [dz], i: [fi], j: [fj], k: [fk], visible: true }, [DOT]);
 }
 
@@ -3928,6 +3929,23 @@ function card(i, turn, from) {
       <h2>문제가 가장 비슷한 HE 논문</h2>${plist(c.nearest_he, q => ` · 유사도 ${q.sim.toFixed(2)}`)}</details>`;
   document.getElementById('back').addEventListener('click', () => from());
   document.getElementById('here').addEventListener('click', () => spot(p, null));
+}
+// 점(논문)을 누르면 그 논문에 대한 정보만: 무슨 문제인지, 세부 과제, 분야·연산·참여 구조, 핵심어
+function paperCard(i) {
+  cur = { p: P[i], i }; view = 'paper'; ring(P[i], false);
+  const names = ['d', 'c', 's'].map((f, j) => D.pf[i][j].map(v => D.F[f][v]).join(', ')).filter(Boolean);
+  const task = D.tk[i] >= 0 && D.TN[D.tk[i]] !== '범용' ? D.TN[D.tk[i]] : '';
+  document.getElementById('out').innerHTML = `<p><button class="back" id="back">← 목록</button>
+      <button class="back" id="area">이 주변 보기</button></p>
+    <div class="region"><div class="meta"><span class="dot" style="background:${D.g[i] ? 'var(--mhe)' : 'var(--mdem)'}"></span>${D.g[i] ? 'HE 논문' : '수요 논문 (다른 프라이버시 기술)'} · ${D.yr[i]}</div>
+      <h3>${link({ title: D.t[i], url: D.u[i] })}</h3>
+      ${D.pk[i] ? `<p class="prob">${esc(D.pk[i])}</p>` : ''}</div>
+    ${task ? `<h2>세부 과제</h2><p class="prob">${esc(task)}</p>` : ''}
+    ${names.length ? `<h2>분야 · 연산 · 참여 구조</h2><p class="prob">${names.map(esc).join(' / ')}</p>` : ''}
+    ${D.kw[i].length ? `<h2>핵심어</h2><div>${D.kw[i].map(([t]) => `<span class="chip">${esc(D.KV[t])}</span>`).join('')}</div>` : ''}`;
+  document.getElementById('back').addEventListener('click', list);
+  document.getElementById('area').addEventListener('click', () => spot(P[i], i));
+  if (narrow()) document.getElementById('out').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 // 누른 지점의 주제: 그 지점에 가까운 논문일수록 크게 센다 (가우스 가중치, 폭 σ는 확대 정도를 따른다).
 // 그래서 바로 옆을 누르면 비슷하지만 조금 다른 주제가 나온다.
@@ -4045,7 +4063,7 @@ gd.addEventListener('pointerup', e => {
   const p = still ? surfaceAt(e.clientX, e.clientY) : null;
   if (!p) return;
   const i = paperAt(p);
-  setTimeout(() => spot(i == null ? p : P[i], i), 0);
+  setTimeout(() => i == null ? spot(p, null) : paperCard(i), 0);  // 점을 누르면 그 논문만, 빈 곳을 누르면 그 주변
 }, true);
 gd.addEventListener('pointermove', e => {  // 마우스 아래 논문 제목
   if (down || e.pointerType === 'touch') return;
@@ -4068,7 +4086,7 @@ function onCam() {  // 카메라가 바뀐 뒤: 지금 카메라를 적어 두�
   syncCam();
   const r = sigFor(L); if (r === SIG) return;
   SIG = r; clearTimeout(zoomTimer);
-  zoomTimer = setTimeout(() => { if (view === 'spot' && cur) spot(cur.p, cur.i); else if (markP) ring(markP); zoomTimer = null; }, 150);
+  zoomTimer = setTimeout(() => { if (view === 'spot' && cur) spot(cur.p, cur.i); else if (markP) ring(markP, ringOn); zoomTimer = null; }, 150);
 }
 gd.on('plotly_relayout', e => { if (Object.keys(e).some(k => k.startsWith('scene.camera'))) onCam(); });
 // 휠 확대는 직접 한다: Plotly 3D의 휠 확대는 한 칸에 몇 배씩 움직여 구 안(0.7)이나 아주 멀리(100)까지 튀었다.
