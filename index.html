@@ -69,8 +69,8 @@ dl.facts { margin:6px 0; } dl.facts dt { color:var(--muted); font-size:12px; mar
 .kpis { display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; margin:8px 0 4px; }
 .kpi { background:var(--chip); border-radius:8px; padding:6px 8px; }
 .kpi b { display:block; font-size:18px; line-height:1.2; } .kpi span { font-size:11px; color:var(--muted); }
-.list .trow { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; align-items:center; }
-.trow > span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.list .trow { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; align-items:start; }
+.trow > span:first-child { overflow-wrap:anywhere; }  /* 긴 이름은 자르지 않고 다음 줄로 */
 .trow .n { float:none; margin:0; white-space:nowrap; }
 .trow .bar { grid-column:1 / -1; display:flex; height:4px; margin-top:4px; border-radius:2px; overflow:hidden; }
 .trow .bar i { display:block; height:100%; } .trow .bar .d { background:var(--demg); } .trow .bar .h { background:var(--he); }
