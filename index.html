@@ -4016,11 +4016,12 @@ function spot(p, clicked) {
   const tcnt = new Map(), kcnt = new Map();
   for (const [i, x] of w) {
     const k = D.tk[i];
-    if (k >= 0 && D.TN[k] !== '범용') { const v = tcnt.get(k) || [0, 0]; v[D.g[i]] += x; tcnt.set(k, v); }
+    if (k >= 0 && D.TN[k] !== '범용') { const v = tcnt.get(k) || [0, 0, 0, 0]; v[D.g[i]] += x; v[2 + D.g[i]]++; tcnt.set(k, v); }
     for (const [t, s] of D.kw[i]) kcnt.set(t, (kcnt.get(t) || 0) + x * s);
   }
   const TW = [...tcnt.values()].reduce((a, v) => a + v[0] + v[1], 0);
-  const tasks = [...tcnt.entries()].sort((a, b) => (b[1][0] + b[1][1]) - (a[1][0] + a[1][1])).slice(0, 8);
+  // 근처 논문 수가 많은 순, 같으면 누른 곳에 가까운(가중치가 큰) 순
+  const tasks = [...tcnt.entries()].sort((a, b) => (b[1][2] + b[1][3]) - (a[1][2] + a[1][3]) || (b[1][0] + b[1][1]) - (a[1][0] + a[1][1])).slice(0, 8);
   const kws = [...kcnt.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14);
   const share = W ? Wh / W : 0, base = D.g.reduce((a, g) => a + g, 0) / N;
   const deg = i => (Math.acos(Math.min(1, dot(P[i], p))) * 180 / Math.PI).toFixed(1);
@@ -4033,12 +4034,11 @@ function spot(p, clicked) {
     const body = `<span>${esc(U[k][0])}${tagOf(k)}</span><span class="n">${pct((d + h) / W)} · HE ${pct(h / (d + h))}</span>`;
     return cardOf[k] != null ? `<button class="trow" data-c="${cardOf[k]}">${body}</button>` : `<div class="row trow">${body}</div>`;
   };
-  // 세부 과제 한 줄: 막대 길이 = 이 지점에서의 비중, 파란 부분 = 그중 HE. 오른쪽 = 전체 논문 중 HE 편수
-  const tmax = tasks.length ? tasks[0][1][0] + tasks[0][1][1] : 1;
-  const trow = ([k, [d, h]]) => {
-    const [nd, nh] = D.TC[k];
-    return `<div class="row trow" title="${esc(D.TN[k])}"><span>${esc(D.TN[k])}${nh === 0 && nd >= 2 ? '<span class="tag gap0">HE 0</span>' : ''}</span>
-      <span class="n">HE ${nh}/${nd + nh}</span><div class="bar"><i class="d" style="width:${(100 * d / tmax).toFixed(1)}%"></i><i class="h" style="width:${(100 * h / tmax).toFixed(1)}%"></i></div></div>`;
+  // 세부 과제 한 줄: 근처(셀 범위 안) 논문 수와 그중 HE 수. 데이터 전체에도 HE가 없으면 표시 (막대는 설명 없이는 읽기 어려워 숫자로)
+  const trow = ([k, [, , nd, nh]]) => {
+    const [td, th] = D.TC[k];
+    return `<div class="row trow" title="${esc(D.TN[k])}"><span>${esc(D.TN[k])}${th === 0 && td >= 2 ? '<span class="tag gap0">전체에도 HE 없음</span>' : ''}</span>
+      <span class="n">근처 ${nd + nh}편 · HE ${nh}편</span></div>`;
   };
   const nearAll = [...nearest(0, 3), ...nearest(1, 2)].sort((a, b) => dot(P[b], p) - dot(P[a], p));
   const prow = i => `<li><span class="dot" style="background:${D.g[i] ? 'var(--mhe)' : 'var(--mdem)'}"></span>${link({ title: D.t[i], url: D.u[i] })} <span class="meta">${D.yr[i]} · ${deg(i)}°</span></li>`;
@@ -4062,7 +4062,7 @@ function spot(p, clicked) {
         ${share < base / 2 ? '<span class="tag gap0">HE 드묾</span>' : ''}</div>`
         : '<div class="empty">가까이에 논문이 없습니다. 축소해 보세요.</div>'}</div>
     ${clicked == null ? '' : `<p class="src">누른 논문: <span class="dot" style="background:${D.g[clicked] ? 'var(--mhe)' : 'var(--mdem)'}"></span>${link({ title: D.t[clicked], url: D.u[clicked] })} (${D.yr[clicked]})</p>`}
-    ${tasks.length ? `<h2>세부 과제 <span class="meta">막대: 이 지점 비중(파랑 HE) · 숫자: 전체 HE/논문</span></h2><div class="list">${tasks.slice(0, 6).map(trow).join('')}</div>` : ''}
+    ${tasks.length ? `<h2>세부 과제 <span class="meta">많은 순</span></h2><div class="list">${tasks.slice(0, 6).map(trow).join('')}</div>` : ''}
     ${kws.length ? `<h2>핵심어</h2><div>${kws.slice(0, 10).map(([t]) => `<span class="chip">${esc(D.KV[t])}</span>`).join('')}</div>` : ''}
     ${gaps.length ? `<h2>근처의 HE 공백 문제</h2><div class="list">${gaps.map(i => `<button class="trow" data-c="${i}"><span>${esc(C[i].name_ko)}</span><span class="n">수요 ${C[i].n_demand}</span></button>`).join('')}</div>` : ''}
     <details class="more"><summary>자세히 · 가까운 논문 · 분야/연산/참여 구조 · 다른 문제</summary>
