@@ -57,6 +57,8 @@ dl.facts { margin:6px 0; } dl.facts dt { color:var(--muted); font-size:12px; mar
   border:1px solid var(--line); border-radius:6px; padding:3px 8px; font-size:12px; line-height:1.4; box-shadow:0 2px 8px rgba(0,0,0,.12); }
 .key { white-space:nowrap; }
 .sub { color:var(--muted); font-size:12px; margin:2px 0 8px; }
+#axsvg { position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; overflow:visible; }
+#axsvg line { stroke:var(--axis); stroke-width:1.5; transition:opacity .15s; }
 .axlab { position:absolute; z-index:4; transform:translate(-50%, -50%); pointer-events:none; white-space:nowrap;
   font-size:12px; color:var(--fg); background:var(--card); border:1px solid var(--line); border-radius:10px; padding:1px 8px;
   transition:opacity .15s; }
@@ -3816,7 +3818,7 @@ const DOTN = 20, dotTrace = { type: 'mesh3d', x: [0, 0, 0], y: [0, 0, 0], z: [0,
 const AX = D.AX || [];
 const axisTrace = AX.length
   ? { type: 'scatter3d', mode: 'lines', hoverinfo: 'skip', showlegend: false, line: { color: css('--axis'), width: 2 },
-      ...['x', 'y', 'z'].reduce((o, c, q) => ({ ...o, [c]: AX.flatMap(a => [1.0 * a.dir[q], 1.05 * a.dir[q], null]) }), {}) }
+      x: [], y: [], z: [] }  // 이름표와 그 선은 지도 위에 HTML·SVG로 그린다 (3D 선은 축 범위 ±1.1 밖이 잘려 길게 못 뺀다)
   : { type: 'scatter3d', mode: 'lines+text', x: [0, 0], y: [0, 0], z: [-1.1, 1.1], text: ['S', 'N'],
       textposition: ['bottom center', 'top center'], textfont: { color: css('--axis'), size: 12 },
       hoverinfo: 'skip', showlegend: false, line: { color: css('--axis'), width: 2 } };
@@ -4082,7 +4084,9 @@ function surfaceAt(cx, cy) {  // 화면 좌표 → 구 표면의 방향 (구를 
 // 6방향 이름표는 3D 글자 대신 HTML로 지도 위에 놓는다 (3D 글자는 구 뒤로 가면 반쯤 잘렸다).
 // 매 화면마다 카메라 행렬로 위치를 구하고, 이름표 방향이 구 뒤쪽으로 가면 흐리게 하다가 숨긴다.
 const axlabs = document.getElementById('axlabs');
-axlabs.innerHTML = AX.map(a => `<div class="axlab">${esc(a.label)}</div>`).join('');
+axlabs.innerHTML = `<svg id="axsvg">${AX.map(() => '<line></line>').join('')}</svg>` + AX.map(a => `<div class="axlab">${esc(a.label)}</div>`).join('');
+const axEls = axlabs.querySelectorAll('.axlab'), axLines = axlabs.querySelectorAll('line');
+const AX_LEN = 48;  // 구 표면에서 이름표까지 선 길이 (화면 픽셀)
 function screenOf(q) {  // 데이터 좌표 → 화면 좌표 (surfaceAt의 반대)
   const sc = gd._fullLayout.scene._scene, gl = sc && sc.glplot;
   if (!gl) return null;
@@ -4095,11 +4099,20 @@ function screenOf(q) {  // 데이터 좌표 → 화면 좌표 (surfaceAt의 반�
 function placeLabels() {
   if (AX.length) {
     const e = eye(), en = norm([e.x, e.y, e.z]), box = gd.parentElement.getBoundingClientRect();
+    const c = screenOf([0, 0, 0]);
     AX.forEach((a, k) => {
-      const el = axlabs.children[k], f = dot(a.dir, en), xy = screenOf(a.dir.map(v => 1.06 * v));
-      if (!xy || f < -0.15) { el.style.opacity = 0; return; }
-      el.style.opacity = f > 0.15 ? 1 : 0.35;
-      el.style.left = `${xy[0] - box.left}px`; el.style.top = `${xy[1] - box.top}px`;
+      const el = axEls[k], ln = axLines[k], f = dot(a.dir, en), s = screenOf(a.dir);
+      if (!s || !c || f < -0.15) { el.style.opacity = 0; ln.style.opacity = 0; return; }
+      // 선: 구 표면의 그 방향 점에서 화면상 구 중심 반대쪽으로 AX_LEN만큼, 이름표는 선 끝 바깥쪽에
+      let ux = s[0] - c[0], uy = s[1] - c[1]; const n = Math.hypot(ux, uy);
+      if (n < 1) { ux = 0; uy = -1; } else { ux /= n; uy /= n; }
+      const x0 = s[0] - box.left, y0 = s[1] - box.top, x1 = x0 + ux * AX_LEN, y1 = y0 + uy * AX_LEN, op = f > 0.15 ? 1 : 0.35;
+      ln.setAttribute('x1', x0); ln.setAttribute('y1', y0); ln.setAttribute('x2', x1); ln.setAttribute('y2', y1);
+      // 이름표는 선 끝 바깥쪽에 붙이되 지도 틀 밖으로 나가면 안쪽으로 민다 (좁은 화면에서 잘리지 않게)
+      const w = el.offsetWidth, left = ux >= 0 ? x1 + 4 : x1 - 4 - w;
+      el.style.left = `${Math.max(4, Math.min(box.width - 4 - w, left))}px`; el.style.top = `${y1}px`;
+      el.style.transform = 'translate(0, -50%)';
+      el.style.opacity = op; ln.style.opacity = op;
     });
   }
   requestAnimationFrame(placeLabels);
